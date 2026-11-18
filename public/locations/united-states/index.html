@@ -350,5 +350,23 @@
     </div>
   </footer>
   <script src="/site.js"></script>
+<!-- Suncoast Chatwoot (default off; enable + token via deploy env) -->
+<link rel="stylesheet" href="/chatwoot-polish.css" />
+<script>
+  window.CHATWOOT_CONFIG = window.CHATWOOT_CONFIG || {
+    enabled: false,
+    baseUrl: "https://support.suncoastservers.com",
+    websiteToken: "",
+    launcherTitle: "Talk to a person",
+    widgetColor: "#0f766e",
+    brandName: "Suncoast Servers",
+    showNudge: true,
+    greetingLines: [
+      "A person answers this chat, with AI as backup.",
+      "Our AI gives faster first answers — a person still reads every message.",
+    ],
+  };
+</script>
+<script src="/chatwoot.js" defer></script>
 </body>
 </html>
