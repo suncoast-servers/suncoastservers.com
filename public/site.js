@@ -74,11 +74,11 @@
   }
 
   const form = document.getElementById("quote-form");
-  form?.addEventListener("submit", (event) => {
-    event.preventDefault();
-    const data = new FormData(form);
-    if (String(data.get("company_url") || "").trim()) return;
+  const formStatus = document.getElementById("form-status");
+  const formStarted = Date.now();
 
+  // The old behaviour, and still the fallback: open the visitor's email app with everything filled in.
+  const sendByEmail = (data) => {
     const body = [
       `Name: ${data.get("name") || ""}`,
       `Email: ${data.get("email") || ""}`,
@@ -93,5 +93,68 @@
       encodeURIComponent(`Suncoast Servers inquiry: ${data.get("service") || "General"}`) +
       "&body=" +
       encodeURIComponent(body);
+  };
+
+  // Campaign tags from the page URL, sent along with the lead (not secret).
+  const campaignTags = () => {
+    const tags = {};
+    try {
+      const params = new URLSearchParams(window.location.search);
+      ["utm_source", "utm_medium", "utm_campaign"].forEach((key) => {
+        const value = params.get(key);
+        if (value) tags[key] = value.slice(0, 120);
+      });
+    } catch (_) {}
+    return tags;
+  };
+
+  // Tries the CRM first (/api/lead). Anything but a clear "got it" falls back to email, so no lead is lost.
+  const sendToCrm = async (data) => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 12000);
+    try {
+      const response = await fetch("/api/lead", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: String(data.get("name") || ""),
+          email: String(data.get("email") || ""),
+          service: String(data.get("service") || ""),
+          message: String(data.get("message") || ""),
+          company_url: String(data.get("company_url") || ""),
+          elapsedMs: Date.now() - formStarted,
+          utm: campaignTags()
+        }),
+        signal: controller.signal
+      });
+      const out = await response.json().catch(() => ({}));
+      return response.ok && out.ok === true;
+    } catch (_) {
+      return false;
+    } finally {
+      clearTimeout(timer);
+    }
+  };
+
+  form?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const data = new FormData(form);
+    if (String(data.get("company_url") || "").trim()) return;
+
+    const button = form.querySelector("button[type=submit]");
+    if (button) button.disabled = true;
+    const sent = await sendToCrm(data);
+    if (button) button.disabled = false;
+
+    if (sent && formStatus) {
+      form.reset();
+      // The note about the email app is only true for the email fallback, so hide it after a real send.
+      const emailNote = document.getElementById("form-email-note");
+      if (emailNote) emailNote.hidden = true;
+      formStatus.textContent = "Thanks, we got it. We will email you back soon.";
+      formStatus.hidden = false;
+      return;
+    }
+    sendByEmail(data);
   });
 })();
